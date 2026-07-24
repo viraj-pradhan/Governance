@@ -1,0 +1,38 @@
+# Render Blueprint Configuration (Native Web Services — No Docker required)
+services:
+  # ── Backend: Python FastAPI Governance Gateway Web Service ─────────
+  - type: web
+    name: governance-gateway
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: "pip install -r gateway/requirements.txt"
+    startCommand: "uvicorn gateway.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: MONGODB_URL
+        value: "mongodb+srv://Governance:viraj@governance.xnzioql.mongodb.net/governance?retryWrites=true&w=majority"
+      - key: PYTHON_VERSION
+        value: "3.10.12"
+      - key: REDIS_URL
+        value: ""
+      - key: OPA_URL
+        value: ""
+
+  # ── Frontend: React / Vite Dashboard Static Site Web Service ──────
+  - type: web
+    name: governance-dashboard
+    env: static
+    region: singapore
+    plan: free
+    buildCommand: "cd dashboard && npm install && npm run build"
+    staticPublishPath: "dashboard/dist"
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: governance-gateway
+          property: url

@@ -24,19 +24,35 @@ A real-time authorization gateway that sits in front of autonomous financial age
 
 ## Quick Start
 
-### With Docker (recommended)
+### Deploy to Render (onrender.com) — Native Web Services (No Docker)
+
+You can deploy directly to Render as native **Web Services** (Python + Static Site) using the included `render.yaml` blueprint:
+
+1. Push this repository to GitHub.
+2. Go to **Render Dashboard** → **New** → **Blueprint**.
+3. Connect your GitHub repository `viraj-pradhan/Governance`.
+4. Render will automatically detect `render.yaml` and create 2 services:
+   - **`governance-gateway`**: Python Web Service running FastAPI with MongoDB Atlas (`pip install -r gateway/requirements.txt`, `uvicorn gateway.main:app --host 0.0.0.0 --port $PORT`).
+   - **`governance-dashboard`**: React Static Site (`npm install && npm run build`).
+
+**Manual Setup on Render (if not using Blueprint):**
+- **Backend (Python Web Service)**:
+  - Build Command: `pip install -r gateway/requirements.txt`
+  - Start Command: `uvicorn gateway.main:app --host 0.0.0.0 --port $PORT`
+  - Environment Variable: `MONGODB_URL` = `mongodb+srv://Governance:viraj@governance.xnzioql.mongodb.net/governance?retryWrites=true&w=majority`
+- **Frontend (Static Site)**:
+  - Build Command: `cd dashboard && npm install && npm run build`
+  - Publish Directory: `dashboard/dist`
+  - Environment Variable: `VITE_API_BASE_URL` = `https://<your-gateway-backend-url>.onrender.com`
+
+---
+
+### With Docker (Optional)
 
 ```bash
 cd governance-layer
 docker-compose up --build
 ```
-
-Services:
-- **Gateway API**: http://localhost:8000 (+ docs at /docs)
-- **Dashboard**: http://localhost:5173
-- **OPA**: http://localhost:8181
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
 
 ### Without Docker (local dev)
 
