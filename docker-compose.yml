@@ -1,0 +1,77 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gov-postgres
+    environment:
+      POSTGRES_DB: governance
+      POSTGRES_USER: gov_user
+      POSTGRES_PASSWORD: gov_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gov_user -d governance"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: gov-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  opa:
+    image: openpolicyagent/opa:latest-static
+    container_name: gov-opa
+    ports:
+      - "8181:8181"
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "/policies"
+    volumes:
+      - ./policies:/policies
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: gov-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://gov_user:gov_pass@postgres:5432/governance
+      REDIS_URL: redis://redis:6379/0
+      OPA_URL: http://opa:8181
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
+        condition: service_started
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: gov-dashboard
+    ports:
+      - "5173:80"
+    depends_on:
+      - gateway
+
+volumes:
+  pgdata:

@@ -1,0 +1,7 @@
+{
+    "allowlists": {
+        "agent-alpha": ["acme-corp", "globex-inc", "initech", "umbrella-bank"],
+        "agent-beta": ["acme-corp", "globex-inc", "wayne-enterprises"],
+        "agent-gamma": ["acme-corp"]
+    }
+}
