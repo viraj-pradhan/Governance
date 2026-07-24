@@ -53,6 +53,17 @@ app.include_router(estop.router)
 app.include_router(review.router)
 
 
+@app.get("/")
+async def root():
+    return {
+        "service": "Governance Gateway",
+        "status": "online",
+        "database": "MongoDB Atlas",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
