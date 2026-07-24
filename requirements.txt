@@ -10,3 +10,4 @@ pydantic-settings==2.9.1
 sse-starlette==2.3.5
 networkx==3.4.2
 gunicorn==23.0.0
+certifi==2024.12.14

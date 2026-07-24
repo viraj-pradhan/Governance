@@ -34,10 +34,13 @@ async def init_db() -> None:
     mongo_uri = settings.mongodb_url
     if mongo_uri:
         try:
+            import certifi
+            ca = certifi.where()
             _mongo_client = motor.motor_asyncio.AsyncIOMotorClient(
                 mongo_uri,
-                serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=5000,
+                serverSelectionTimeoutMS=8000,
+                connectTimeoutMS=8000,
+                tlsCAFile=ca,
             )
             # Ping to verify connectivity
             await _mongo_client.admin.command("ping")
@@ -45,13 +48,30 @@ async def init_db() -> None:
             if _mongo_db is None:
                 _mongo_db = _mongo_client["governance"]
             _use_sqlite = False
+        except Exception as e:
+            print(f"MongoDB Atlas SSL connection failed ({e}). Trying fallback SSL options...")
+            try:
+                _mongo_client = motor.motor_asyncio.AsyncIOMotorClient(
+                    mongo_uri,
+                    serverSelectionTimeoutMS=8000,
+                    connectTimeoutMS=8000,
+                    tls=True,
+                    tlsAllowInvalidCertificates=True,
+                )
+                await _mongo_client.admin.command("ping")
+                _mongo_db = _mongo_client.get_default_database()
+                if _mongo_db is None:
+                    _mongo_db = _mongo_client["governance"]
+                _use_sqlite = False
+            except Exception as e2:
+                print(f"MongoDB connection failed ({e2}). Falling back to SQLite...")
+                _mongo_client = None
 
+        if _mongo_client and not _use_sqlite:
             # Create indexes for fast lookups
             await _ensure_indexes()
             print(f"Connected to MongoDB Atlas (db: {_mongo_db.name}).")
             return
-        except Exception as e:
-            print(f"MongoDB connection failed ({e}). Falling back to SQLite...")
 
     print(f"Using local SQLite DB ({_SQLITE_PATH})...")
     _use_sqlite = True
