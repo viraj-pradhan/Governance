@@ -10,7 +10,29 @@ from fastapi import APIRouter, HTTPException
 from gateway import db, redis_client, opa_client
 from gateway.models import PolicyCreate, PolicyResponse
 
+from datetime import datetime, timezone
+
 router = APIRouter(prefix="/policies", tags=["policies"])
+
+
+def _parse_policy_id(val: Any) -> uuid.UUID:
+    if isinstance(val, uuid.UUID):
+        return val
+    try:
+        return uuid.UUID(str(val))
+    except Exception:
+        return uuid.uuid4()
+
+
+def _parse_datetime(val: Any) -> datetime:
+    if isinstance(val, datetime):
+        return val
+    if isinstance(val, str) and val:
+        try:
+            return datetime.fromisoformat(val.replace("Z", "+00:00"))
+        except Exception:
+            pass
+    return datetime.now(timezone.utc)
 
 
 @router.get("", response_model=list[PolicyResponse])
@@ -28,9 +50,16 @@ async def list_policies(agent_id: Optional[str] = None):
         )
     results = []
     for r in rows:
-        d = dict(r)
-        d["id"] = uuid.UUID(d["id"]) if isinstance(d["id"], str) else d["id"]
-        results.append(PolicyResponse(**d))
+        d = dict(r) if not isinstance(r, dict) else r
+        results.append(PolicyResponse(
+            id=_parse_policy_id(d.get("id")),
+            agent_id=d.get("agent_id", ""),
+            version=d.get("version", 1),
+            rego_body=d.get("rego_body", ""),
+            daily_spend_limit=d.get("daily_spend_limit", 50000),
+            active=d.get("active", True),
+            created_at=_parse_datetime(d.get("created_at")),
+        ))
     return results
 
 
@@ -42,41 +71,38 @@ async def create_policy(body: PolicyCreate):
         # Auto-create if bootstrapping
         await db.execute(
             """INSERT INTO agents (id, agent_id, version, name, agent_type)
-               VALUES ($1, $2, '1.0.0', $3, 'generic-agent')
-               ON CONFLICT(agent_id, version) DO NOTHING""",
-            str(uuid.uuid4()), body.agent_id, f"Agent {body.agent_id}"
+               VALUES ($1, $2, $3, $4, $5)""",
+            str(uuid.uuid4()), body.agent_id, "1.0.0", f"Agent {body.agent_id}", "generic-agent"
         )
 
     # Deactivate previous versions
     await db.execute(
-        "UPDATE policies SET active = false WHERE agent_id = $1 AND active = true",
-        body.agent_id,
+        "UPDATE policies SET active = $1 WHERE agent_id = $2 AND active = $3",
+        False, body.agent_id, True,
     )
 
-    # Determine next version number
-    last = await db.fetch_one(
-        "SELECT MAX(version) as max_v FROM policies WHERE agent_id = $1",
+    # Determine next version number by counting existing policies
+    existing = await db.fetch_all(
+        "SELECT version FROM policies WHERE agent_id = $1",
         body.agent_id,
     )
-    next_version = (last["max_v"] or 0) + 1 if last and last.get("max_v") else 1
+    next_version = max((r.get("version", 0) for r in existing), default=0) + 1
 
-    policy_pk = str(uuid.uuid4())
+    policy_pk = uuid.uuid4()
+    now = datetime.now(timezone.utc)
     await db.execute(
-        """INSERT INTO policies (id, agent_id, version, rego_body, daily_spend_limit)
-           VALUES ($1, $2, $3, $4, $5)""",
-        policy_pk,
+        """INSERT INTO policies (id, agent_id, version, rego_body, daily_spend_limit, active)
+           VALUES ($1, $2, $3, $4, $5, $6)""",
+        str(policy_pk),
         body.agent_id,
         next_version,
         body.rego_body,
         body.daily_spend_limit,
-    )
-    r = await db.fetch_one(
-        "SELECT id, agent_id, version, rego_body, daily_spend_limit, active, created_at FROM policies WHERE id = $1",
-        policy_pk
+        True,
     )
 
     # Push Rego to OPA
-    pushed = await opa_client.push_policy(policy_pk, body.rego_body)
+    pushed = await opa_client.push_policy(str(policy_pk), body.rego_body)
 
     # Update Redis spend limit cache
     if body.daily_spend_limit:
@@ -84,7 +110,12 @@ async def create_policy(body: PolicyCreate):
             str(body.agent_id), body.daily_spend_limit
         )
 
-    d = dict(r)
-    d["id"] = uuid.UUID(d["id"]) if isinstance(d["id"], str) else d["id"]
-    return PolicyResponse(**d)
-
+    return PolicyResponse(
+        id=policy_pk,
+        agent_id=body.agent_id,
+        version=next_version,
+        rego_body=body.rego_body,
+        daily_spend_limit=body.daily_spend_limit,
+        active=True,
+        created_at=now,
+    )

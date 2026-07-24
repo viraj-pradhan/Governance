@@ -4,7 +4,10 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Postgres
+    # MongoDB Atlas
+    mongodb_url: str = ""
+
+    # Postgres (legacy fallback)
     database_url: str = "postgresql://gov_user:gov_pass@localhost:5432/governance"
 
     # Redis

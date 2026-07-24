@@ -79,6 +79,11 @@ async def process_action(req: ActionRequest) -> ActionResponse:
         )
 
     allowed_actions = agent_row.get("allowed_action_types") or []
+    if isinstance(allowed_actions, str):
+        try:
+            allowed_actions = json.loads(allowed_actions)
+        except (json.JSONDecodeError, TypeError):
+            allowed_actions = []
     if allowed_actions and req.action not in allowed_actions:
         return await _audit_and_respond(
             trace_id, req, "FRAGMENT_2_AUTH", "AUTH_FAIL", "REJECT", start_ns

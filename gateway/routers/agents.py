@@ -20,16 +20,16 @@ async def list_agents():
     )
     results = []
     for r in rows:
-        spend = await redis_client.get_current_spend(r["agent_id"])
-        limit = await redis_client.get_daily_limit(r["agent_id"])
+        spend = await redis_client.get_current_spend(r.get("agent_id", ""))
+        limit = await redis_client.get_daily_limit(r.get("agent_id", ""))
         results.append(AgentResponse(
-            id=r["id"],
-            agent_id=r["agent_id"],
-            version=r["version"],
-            name=r["name"],
-            agent_type=r["agent_type"],
-            status=r["status"],
-            created_at=r["created_at"],
+            id=r.get("id", ""),
+            agent_id=r.get("agent_id", ""),
+            version=r.get("version", "1.0.0"),
+            name=r.get("name", "Unknown"),
+            agent_type=r.get("agent_type", "unknown"),
+            status=r.get("status", "active"),
+            created_at=r.get("created_at", ""),
             current_spend=spend,
             daily_limit=limit,
         ))
@@ -55,13 +55,13 @@ async def create_agent(body: AgentCreate):
         body.agent_id, body.version
     )
     return AgentResponse(
-        id=uuid.UUID(r["id"]) if isinstance(r["id"], str) else r["id"],
-        agent_id=r["agent_id"],
-        version=r["version"],
-        name=r["name"],
-        agent_type=r["agent_type"],
-        status=r["status"],
-        created_at=r["created_at"],
+        id=r.get("id", agent_pk),
+        agent_id=r.get("agent_id", body.agent_id),
+        version=r.get("version", body.version),
+        name=r.get("name", body.name),
+        agent_type=r.get("agent_type", body.agent_type),
+        status=r.get("status", "active"),
+        created_at=r.get("created_at", ""),
     )
 
 

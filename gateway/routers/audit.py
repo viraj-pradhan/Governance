@@ -56,8 +56,9 @@ async def get_audit_log(
     rows = await db.fetch_all(query, *values)
     results = []
     for r in rows:
-        d = dict(r)
-        d["trace_id"] = str(d["trace_id"])
+        d = dict(r) if not isinstance(r, dict) else r
+        if "trace_id" in d:
+            d["trace_id"] = str(d["trace_id"])
         if isinstance(d.get("details"), str):
             try:
                 d["details"] = json.loads(d["details"])
