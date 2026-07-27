@@ -1,7 +1,7 @@
 # Technical Stack Specifications
 
 ## Overview
-The **Antigravity Autonomous AI Financial Agent Governance Gateway** is a ultra-low-latency, fail-closed financial authorization system. It enforces real-time spend limits, policy rules (OPA/Rego), sanctions/AML compliance checks, NetworkX-driven mule network detection, and human-in-the-loop step-up reviews for autonomous agent transactions.
+The **AI Financial Agent Governance Gateway** is a ultra-low-latency, fail-closed financial authorization system. It enforces real-time spend limits, policy rules (OPA/Rego), sanctions/AML compliance checks, NetworkX-driven mule network detection, and human-in-the-loop step-up reviews for autonomous agent transactions.
 
 ---
 
