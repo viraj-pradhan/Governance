@@ -15,7 +15,7 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// ── Agents ──────────────────────────────────────────────────
+// -- Agents --
 
 export const fetchAgents = () => request('/agents');
 
@@ -28,7 +28,16 @@ export const revokeAgent = (id) =>
 export const reinstateAgent = (id) =>
   request(`/agents/${id}/reinstate`, { method: 'POST' });
 
-// ── Policies ────────────────────────────────────────────────
+export const pauseAgent = (agentId) =>
+  request(`/agents/${agentId}/estop`, { method: 'POST' });
+
+export const resumeAgent = (agentId) =>
+  request(`/agents/${agentId}/resume`, { method: 'POST' });
+
+export const updateAgentBudget = (agentId, dailyLimit) =>
+  request(`/agents/${agentId}/budget?daily_limit=${dailyLimit}`, { method: 'PATCH' });
+
+// -- Policies --
 
 export const fetchPolicies = (agentId) =>
   request(`/policies${agentId ? `?agent_id=${agentId}` : ''}`);
@@ -36,7 +45,7 @@ export const fetchPolicies = (agentId) =>
 export const createPolicy = (data) =>
   request('/policies', { method: 'POST', body: JSON.stringify(data) });
 
-// ── Fleet / E-Stop ───────────────────────────────────────────
+// -- Fleet / E-Stop --
 
 export const fetchFleetStatus = () => request('/admin/estop/status');
 
@@ -49,8 +58,7 @@ export const resumeFleet = () =>
 export const toggleAgentEstop = (agentId, active = true) =>
   request(`/admin/estop/agent/${agentId}?active=${active}`, { method: 'POST' });
 
-
-// ── Audit Log ───────────────────────────────────────────────
+// -- Audit Log (raw rows) --
 
 export const fetchAuditLog = (params = {}) => {
   const qs = new URLSearchParams();
@@ -63,11 +71,23 @@ export const fetchAuditLog = (params = {}) => {
   return request(`/audit-log?${qs.toString()}`);
 };
 
-// ── Metrics ─────────────────────────────────────────────────
+// -- Grouped Decisions (one row per trace_id) --
+
+export const fetchRecentDecisions = (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.agent_id) qs.set('agent_id', params.agent_id);
+  if (params.verdict) qs.set('verdict', params.verdict);
+  if (params.search) qs.set('search', params.search);
+  if (params.limit) qs.set('limit', params.limit);
+  if (params.offset) qs.set('offset', params.offset);
+  return request(`/decisions/recent?${qs.toString()}`);
+};
+
+// -- Metrics --
 
 export const fetchLatencyMetrics = () => request('/metrics/latency');
 
-// ── SSE Live Feed ───────────────────────────────────────────
+// -- SSE Live Feed --
 
 export function connectLiveFeed(onEvent, onError) {
   const es = new EventSource(`${API_BASE}/live`);
@@ -86,10 +106,10 @@ export function connectLiveFeed(onEvent, onError) {
     if (onError) onError(err);
   };
 
-  return es; // caller can close with es.close()
+  return es;
 }
 
-// ── Simulation Toggles (Phase 2) ────────────────────────────
+// -- Simulation Toggles --
 
 export const fetchSimulationStatus = () => request('/admin/simulate/status');
 
@@ -105,20 +125,20 @@ export const startTrafficSimulation = () =>
 export const stopTrafficSimulation = () =>
   request('/admin/simulate/traffic/stop', { method: 'POST' });
 
-// ── Action / Authorize (Phase 2) ────────────────────────────
+// -- Action / Authorize --
 
 export const simulateAction = (data) =>
   request('/action/simulate', { method: 'POST', body: JSON.stringify(data) });
 
-// ── Explanations (Phase 2) ──────────────────────────────────
+// -- Explanations --
 
 export const fetchExplanations = () => request('/explanations');
 
-// ── Graph (Phase 2) ─────────────────────────────────────────
+// -- Graph --
 
 export const fetchGraph = () => request('/graph');
 
-// ── Review Queue (Phase 2) ──────────────────────────────────
+// -- Review Queue --
 
 export const fetchReviewQueue = () => request('/review/queue');
 

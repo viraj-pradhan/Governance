@@ -122,6 +122,10 @@ async def _run_pipeline(req: ActionRequest, dry_run: bool = False) -> ActionResp
     risk_score: Optional[int] = None
     risk_factors: List[str] = []
 
+    def _stage_ms() -> float:
+        """Return elapsed ms since pipeline start."""
+        return (time.perf_counter_ns() - start_ns) / 1_000_000
+
     # ── IDEMPOTENCY CHECK (skip for dry-run) ─────────────────────
     if not dry_run and req.idempotency_key:
         cached = await redis_client.get_idempotency(req.idempotency_key)
@@ -147,7 +151,8 @@ async def _run_pipeline(req: ActionRequest, dry_run: bool = False) -> ActionResp
         )
 
     if not dry_run:
-        await _write_audit_node(trace_id, req, "FRAGMENT_1_ESTOP", "ESTOP_CLEAR", "PASS")
+        await _write_audit_node(trace_id, req, "FRAGMENT_1_ESTOP", "ESTOP_CLEAR", "PASS",
+                                details={"latency_ms": round(_stage_ms(), 2)})
 
     # ── FRAGMENT 2: Authentication & Orchestration ──────────────
     agent_row = await db.fetch_one(
@@ -173,7 +178,8 @@ async def _run_pipeline(req: ActionRequest, dry_run: bool = False) -> ActionResp
         )
 
     if not dry_run:
-        await _write_audit_node(trace_id, req, "FRAGMENT_2_AUTH", "AUTH_OK", "PASS")
+        await _write_audit_node(trace_id, req, "FRAGMENT_2_AUTH", "AUTH_OK", "PASS",
+                                details={"latency_ms": round(_stage_ms(), 2)})
 
     # ── FRAGMENT 3: Governance Gates ─────────────────────────────
     # Gate 1: Version Kill-switch
@@ -229,7 +235,8 @@ async def _run_pipeline(req: ActionRequest, dry_run: bool = False) -> ActionResp
             budget_reserved = True
 
     if not dry_run:
-        await _write_audit_node(trace_id, req, "FRAGMENT_3_GATES", "GATES_CLEAR", "PASS")
+        await _write_audit_node(trace_id, req, "FRAGMENT_3_GATES", "GATES_CLEAR", "PASS",
+                                details={"latency_ms": round(_stage_ms(), 2)})
 
     # ── FRAGMENT 4: Risk & Compliance (Parallel) ─────────────────
     risk_task = asyncio.create_task(_calc_risk_score(req.agent_id, req.beneficiary, req.amount))
@@ -250,7 +257,7 @@ async def _run_pipeline(req: ActionRequest, dry_run: bool = False) -> ActionResp
     if not dry_run:
         await _write_audit_node(
             trace_id, req, "FRAGMENT_4_RISK_COMPLIANCE", f"RISK_SCORE_{risk_score}", "PASS",
-            details={"risk_score": risk_score, "risk_factors": risk_factors}
+            details={"risk_score": risk_score, "risk_factors": risk_factors, "latency_ms": round(_stage_ms(), 2)}
         )
 
     # ── FRAGMENT 5: Decision, Escalation & Human Review ──────────
@@ -288,7 +295,8 @@ async def _run_pipeline(req: ActionRequest, dry_run: bool = False) -> ActionResp
                    VALUES ($1, $2, $3, $4, $5, 'EXECUTED')""",
                 uuid.uuid4(), trace_id, req.agent_id, req.amount or Decimal("0"), req.beneficiary or "N/A"
             )
-            await _write_audit_node(trace_id, req, "FRAGMENT_6_EXECUTION", "LEDGER_UPDATED", "SUCCESS")
+            await _write_audit_node(trace_id, req, "FRAGMENT_6_EXECUTION", "LEDGER_UPDATED", "SUCCESS",
+                                    details={"latency_ms": round(_stage_ms(), 2)})
         except Exception:
             if budget_reserved:
                 await redis_client.check_and_increment_spend(req.agent_id, -req.amount, Decimal("999999999"))
@@ -420,7 +428,13 @@ async def _finalize(
         try:
             await _write_audit_node(
                 trace_id, req, node_name, reason_code, outcome,
-                details={"risk_score": risk_score, "risk_factors": risk_factors}
+                details={
+                    "risk_score": risk_score,
+                    "risk_factors": risk_factors,
+                    "latency_ms": round(elapsed_ms, 2),
+                    "amount": float(req.amount) if req.amount else None,
+                    "beneficiary": req.beneficiary,
+                }
             )
         except Exception:
             pass  # Decision must still be returned even if logging fails

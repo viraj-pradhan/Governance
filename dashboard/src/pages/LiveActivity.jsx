@@ -40,8 +40,8 @@ export default function LiveActivity() {
     }
   }, [events]);
 
-  const allowCount = events.filter(e => e.decision === 'ALLOW').length;
-  const denyCount = events.filter(e => e.decision === 'DENY').length;
+  const allowCount = events.filter(e => (e.outcome || e.decision) === 'ALLOW').length;
+  const denyCount = events.filter(e => { const v = e.outcome || e.decision; return v && v !== 'ALLOW'; }).length;
 
   return (
     <div>
@@ -101,29 +101,34 @@ export default function LiveActivity() {
             </p>
           </div>
         ) : (
-          events.map((event) => (
-            <div
-              key={event._id}
-              className={`live-event ${event.decision === 'ALLOW' ? 'event-allow' : 'event-deny'}`}
-            >
-              <div className="event-dot"></div>
-              <div className="event-content">
-                <div className="event-action">
-                  <span className={`badge ${event.decision === 'ALLOW' ? 'badge-allow' : 'badge-deny'}`} style={{ marginRight: 8 }}>
-                    {event.decision}
-                  </span>
-                  {event.action}
-                  {event.amount && <span className="font-mono" style={{ marginLeft: 8 }}>${Number(event.amount).toLocaleString()}</span>}
-                </div>
-                <div className="event-detail">{event.reason}</div>
-                <div className="event-meta">
-                  Agent: {event.agent_id?.slice(0, 8)}…
-                  &nbsp;•&nbsp;{event.latency_ms}ms
-                  &nbsp;•&nbsp;{new Date(event._ts).toLocaleTimeString()}
+          events.map((event) => {
+            const verdict = event.outcome || event.decision || 'UNKNOWN';
+            const reason = event.reason_code || event.reason || '';
+            const latency = event.latency_ms;
+            return (
+              <div
+                key={event._id}
+                className={`live-event ${verdict === 'ALLOW' ? 'event-allow' : 'event-deny'}`}
+              >
+                <div className="event-dot"></div>
+                <div className="event-content">
+                  <div className="event-action">
+                    <span className={`badge ${verdict === 'ALLOW' ? 'badge-allow' : 'badge-deny'}`} style={{ marginRight: 8 }}>
+                      {verdict}
+                    </span>
+                    {event.action}
+                    {event.amount && <span className="font-mono" style={{ marginLeft: 8 }}>${Number(event.amount).toLocaleString()}</span>}
+                  </div>
+                  <div className="event-detail">{reason}</div>
+                  <div className="event-meta">
+                    Agent: {event.agent_id?.slice(0, 8)}...
+                    &nbsp;|&nbsp;{latency != null ? `${Number(latency).toFixed(1)}ms` : '--'}
+                    &nbsp;|&nbsp;{new Date(event._ts).toLocaleTimeString()}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

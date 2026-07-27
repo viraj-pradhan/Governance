@@ -65,3 +65,42 @@ async def create_agent(body: AgentCreate):
     )
 
 
+@router.post("/{agent_id}/revoke")
+async def revoke_agent(agent_id: str):
+    """Revoke an agent — all future requests will be denied."""
+    await db.execute(
+        "UPDATE agents SET status = 'revoked' WHERE agent_id = $1",
+        agent_id
+    )
+    return {"status": "ok", "agent_id": agent_id, "new_status": "revoked"}
+
+
+@router.post("/{agent_id}/reinstate")
+async def reinstate_agent(agent_id: str):
+    """Reinstate a revoked agent to active status."""
+    await db.execute(
+        "UPDATE agents SET status = 'active' WHERE agent_id = $1",
+        agent_id
+    )
+    return {"status": "ok", "agent_id": agent_id, "new_status": "active"}
+
+
+@router.post("/{agent_id}/estop")
+async def pause_agent(agent_id: str):
+    """Per-agent emergency stop — pause this agent without revoking."""
+    await redis_client.set_agent_estop(agent_id, True)
+    return {"status": "ok", "agent_id": agent_id, "paused": True}
+
+
+@router.post("/{agent_id}/resume")
+async def resume_agent(agent_id: str):
+    """Clear per-agent emergency stop — resume processing."""
+    await redis_client.set_agent_estop(agent_id, False)
+    return {"status": "ok", "agent_id": agent_id, "paused": False}
+
+
+@router.patch("/{agent_id}/budget")
+async def update_agent_budget(agent_id: str, daily_limit: float):
+    """Update an agent's daily spend limit."""
+    await redis_client.set_daily_limit(agent_id, daily_limit)
+    return {"status": "ok", "agent_id": agent_id, "daily_limit": daily_limit}

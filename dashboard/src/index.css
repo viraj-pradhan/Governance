@@ -740,3 +740,309 @@ tr:hover td {
     transform: scale(1) translateY(0);
   }
 }
+
+/* ── Global E-Stop Banner ──────────────────────────────────── */
+.estop-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: linear-gradient(90deg, var(--accent-crimson), #c0392b);
+  color: #fff;
+  padding: 10px var(--space-xl);
+  font-weight: 600;
+  font-size: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  box-shadow: 0 2px 12px rgba(255, 59, 48, 0.5);
+  animation: fadeInScale 0.3s ease;
+}
+.estop-banner-icon {
+  background: rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* ── Global E-Stop Button ──────────────────────────────────── */
+.estop-btn {
+  background: var(--accent-crimson) !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 10px rgba(255,59,48,0.4);
+  transition: all 0.2s;
+}
+.estop-btn:hover {
+  background: #c0392b !important;
+  box-shadow: 0 4px 16px rgba(255,59,48,0.5);
+  transform: translateY(-1px);
+}
+.estop-btn.estop-active {
+  background: var(--accent-emerald) !important;
+  box-shadow: 0 2px 10px rgba(52,199,89,0.4);
+}
+.estop-btn.estop-active:hover {
+  background: #28a745 !important;
+}
+
+/* ── Live Indicator ────────────────────────────────────────── */
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-glass);
+}
+.live-indicator.live-connected {
+  color: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+  background: var(--accent-emerald-glow);
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.live-connected .live-dot {
+  background: var(--accent-emerald);
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ── Dashboard Filter Bar ──────────────────────────────────── */
+.dashboard-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+.form-select-sm, .form-input-sm {
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  min-width: 130px;
+  height: 32px;
+}
+.form-select-sm:focus, .form-input-sm:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px var(--accent-blue-glow);
+}
+.form-input-sm { min-width: 200px; }
+
+/* ── Expand Button ─────────────────────────────────────────── */
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.expand-btn:hover {
+  background: var(--bg-glass);
+  color: var(--text-primary);
+}
+
+/* ── Stage Waterfall ───────────────────────────────────────── */
+.stage-detail-container {
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-glass);
+  border-top: 1px solid var(--border-subtle);
+}
+.stage-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  font-size: 0.82rem;
+}
+.stage-detail-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+.stage-waterfall {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stage-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 70px 200px;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.78rem;
+}
+.stage-name {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stage-bar-track {
+  height: 8px;
+  background: var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.stage-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.stage-pass { background: var(--accent-emerald); }
+.stage-fail { background: var(--accent-crimson); }
+.stage-latency {
+  font-family: var(--font-mono);
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+.stage-outcome {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Risk Pill ─────────────────────────────────────────────── */
+.risk-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 22px;
+  border-radius: 11px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.risk-high { background: var(--accent-crimson-glow); color: var(--accent-crimson); border: 1px solid var(--accent-crimson); }
+.risk-med { background: var(--accent-amber-glow); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+.risk-low { background: var(--accent-emerald-glow); color: var(--accent-emerald); border: 1px solid var(--accent-emerald); }
+
+/* ── Hold Badge ─────────────────────────────────────────────── */
+.badge-hold {
+  background: var(--accent-amber-glow);
+  color: var(--accent-amber);
+  border: 1px solid var(--accent-amber);
+}
+
+/* ── Slide-Over Panel ──────────────────────────────────────── */
+.slide-over-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 520px;
+  max-width: 90vw;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-default);
+  box-shadow: -8px 0 40px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  z-index: 500;
+  animation: slideInRight 0.25s ease;
+  overflow: hidden;
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.slide-over-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+.slide-over-header h3 { font-size: 1rem; font-weight: 600; }
+.slide-over-body {
+  padding: var(--space-lg) var(--space-xl);
+  overflow-y: auto;
+  flex: 1;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  font-size: 0.82rem;
+  margin-bottom: var(--space-md);
+}
+.detail-grid > div {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-glass);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+/* ── Raw JSON Block ────────────────────────────────────────── */
+.raw-json-block {
+  margin-top: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  overflow-x: auto;
+  max-height: 320px;
+  overflow-y: auto;
+  white-space: pre;
+}
+
+/* ── Dry-Run Panel ─────────────────────────────────────────── */
+.dry-run-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.dry-run-result {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.85rem;
+  animation: fadeInScale 0.25s ease;
+}
+.dry-run-allow { background: var(--accent-emerald-glow); border-color: var(--accent-emerald); }
+.dry-run-deny { background: var(--accent-crimson-glow); border-color: var(--accent-crimson); }
+
+/* ── Agent Pause Badge ─────────────────────────────────────── */
+.badge-warning { background: var(--accent-amber-glow); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+.btn-warning { background: var(--accent-amber); color: #fff; border: none; }
+.btn-warning:hover { background: #e68900; }
+
+/* ── Decision row group fix for expansion ──────────────────── */
+.decision-row-group td { vertical-align: middle; }
+.stage-detail-row td { padding: 0 !important; }

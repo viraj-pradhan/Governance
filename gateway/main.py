@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from gateway import db, redis_client, opa_client
-from gateway.routers import authorize, agents, policies, kill_switch, audit, metrics, live, estop, review, explanations, admin, graph
+from gateway.routers import authorize, agents, policies, kill_switch, audit, metrics, live, estop, review, explanations, admin, graph, decisions
 
 
 @asynccontextmanager
@@ -54,6 +54,7 @@ app.include_router(review.router)
 app.include_router(explanations.router)
 app.include_router(admin.router)
 app.include_router(graph.router)
+app.include_router(decisions.router)
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
