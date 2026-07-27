@@ -325,24 +325,37 @@ async def _calc_risk_score(
     score = 0
     factors: List[str] = []
 
+    # ── Always update the graph: add/update sender→beneficiary edge ──
+    # This ensures the graph builds up from ALL live traffic, not just fraud cases.
+    if not _mule_graph.has_node(agent_id):
+        _mule_graph.add_node(agent_id, is_mule=False, risk_bump=0, risk_score=0)
+    if not _mule_graph.has_node(beneficiary):
+        _mule_graph.add_node(beneficiary, is_mule=False, risk_bump=0, risk_score=0)
+
+    if _mule_graph.has_edge(agent_id, beneficiary):
+        # Increment edge weight (transaction count)
+        _mule_graph[agent_id][beneficiary]["weight"] = _mule_graph[agent_id][beneficiary].get("weight", 1) + 1
+        _mule_graph[agent_id][beneficiary]["amount"] = float(amount or 0) + _mule_graph[agent_id][beneficiary].get("amount", 0)
+    else:
+        _mule_graph.add_edge(agent_id, beneficiary, weight=1, amount=float(amount or 0))
+
     # Signal 1: Direct mule hit (+80)
-    if beneficiary in _mule_graph and _mule_graph.nodes[beneficiary].get("is_mule"):
+    if _mule_graph.nodes[beneficiary].get("is_mule"):
         score += 80
         factors.append("DIRECT_MULE_HIT")
 
     # Signal 2: 1-hop BFS proximity (+40)
-    elif beneficiary in _mule_graph:
+    else:
         neighbors = list(_mule_graph.neighbors(beneficiary))
         if any(_mule_graph.nodes[n].get("is_mule") for n in neighbors):
             score += 40
             factors.append("GRAPH_PROXIMITY_1HOP")
 
     # Signal 2b: Persistent risk bump from feedback loop
-    if beneficiary in _mule_graph:
-        bump = _mule_graph.nodes[beneficiary].get("risk_bump", 0)
-        if bump > 0:
-            score += bump
-            factors.append(f"FEEDBACK_BUMP_+{bump}")
+    bump = _mule_graph.nodes[beneficiary].get("risk_bump", 0)
+    if bump > 0:
+        score += bump
+        factors.append(f"FEEDBACK_BUMP_+{bump}")
 
     # Signal 3: Velocity deviation (+16)
     velocity_count = _record_velocity(beneficiary)
@@ -356,6 +369,9 @@ async def _calc_risk_score(
         if avg > 0 and float(amount) > 3 * avg:
             score += 12
             factors.append("BEHAVIORAL_ANOMALY")
+
+    # Update beneficiary's running risk score in graph
+    _mule_graph.nodes[beneficiary]["risk_score"] = min(100, score + _mule_graph.nodes[beneficiary].get("risk_score", 0))
 
     return min(score, 100), factors
 
