@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
-import { fetchFleetStatus, haltFleet, resumeFleet } from '../api';
+import { fetchFleetStatus, haltFleet, resumeFleet, fetchSimulationStatus, toggleOpaOutage, toggleRedisOutage } from '../api';
 
 export default function EmergencyStop() {
   const [fleet, setFleet] = useState(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(null); // 'halt' | 'resume' | null
   const [processing, setProcessing] = useState(false);
+  const [simStatus, setSimStatus] = useState({ simulate_opa_outage: false, simulate_redis_outage: false });
 
   const load = async () => {
     try {
-      const data = await fetchFleetStatus();
-      setFleet(data);
+      const [fleetData, simData] = await Promise.all([
+        fetchFleetStatus(),
+        fetchSimulationStatus(),
+      ]);
+      setFleet(fleetData);
+      setSimStatus(simData);
     } catch (e) {
-      console.error('Fleet status error:', e);
+      console.error('Status load error:', e);
     } finally {
       setLoading(false);
     }
@@ -50,11 +55,29 @@ export default function EmergencyStop() {
     }
   };
 
+  const handleToggleOpa = async () => {
+    try {
+      const res = await toggleOpaOutage();
+      setSimStatus(prev => ({ ...prev, simulate_opa_outage: res.simulate_opa_outage }));
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
+  const handleToggleRedis = async () => {
+    try {
+      const res = await toggleRedisOutage();
+      setSimStatus(prev => ({ ...prev, simulate_redis_outage: res.simulate_redis_outage }));
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
   if (loading) {
     return <div className="empty-state"><div className="spinner" style={{ margin: '60px auto' }}></div></div>;
   }
 
-  const isHalted = fleet?.halted;
+  const isHalted = fleet?.global_estop_active;
 
   return (
     <div>
@@ -94,11 +117,9 @@ export default function EmergencyStop() {
           {isHalted ? (
             <>
               <div style={{ color: 'var(--accent-crimson)', fontWeight: 700, marginBottom: 'var(--space-sm)' }}>
-                🚨 All agent requests are being denied
+                All agent requests are being denied
               </div>
               <div className="text-secondary" style={{ fontSize: '0.85rem', lineHeight: 1.7 }}>
-                <strong>Halted by:</strong> {fleet.halted_by || 'unknown'}<br />
-                <strong>Halted at:</strong> {fleet.halted_at ? new Date(fleet.halted_at).toLocaleString() : 'unknown'}<br /><br />
                 Click <strong>Resume Fleet</strong> to restore normal operations.
                 All active agents will immediately begin processing again.
               </div>
@@ -106,7 +127,7 @@ export default function EmergencyStop() {
           ) : (
             <>
               <div style={{ color: 'var(--accent-emerald)', fontWeight: 700, marginBottom: 'var(--space-sm)' }}>
-                ✅ All systems operational
+                All systems operational
               </div>
               <div className="text-secondary" style={{ fontSize: '0.85rem', lineHeight: 1.7 }}>
                 The emergency stop will <strong>immediately deny all agent requests</strong> across
@@ -118,13 +139,75 @@ export default function EmergencyStop() {
         </div>
       </div>
 
+      {/* ── Fail-Closed Simulation Toggles ───────────────── */}
+      <div style={{ marginTop: 'var(--space-xl)' }}>
+        <h3 style={{ marginBottom: 'var(--space-md)', textAlign: 'center' }}>
+          Fail-Closed Simulation Toggles
+        </h3>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 'var(--space-lg)' }}>
+          Simulate infrastructure outages to demonstrate fail-closed behavior. Requests route through fallback paths when active.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)', maxWidth: 700, margin: '0 auto' }}>
+          {/* OPA Outage Toggle */}
+          <div className="glass-card" style={{ textAlign: 'center' }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>OPA Policy Engine</div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: simStatus.simulate_opa_outage ? 'var(--accent-crimson)' : 'var(--accent-emerald)',
+              fontWeight: 600,
+              marginBottom: 'var(--space-md)',
+            }}>
+              {simStatus.simulate_opa_outage ? 'SIMULATED OUTAGE' : 'CONNECTED'}
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.5 }}>
+              {simStatus.simulate_opa_outage
+                ? 'Using in-process policy fallback. Unknown actions will be DENIED (fail-closed).'
+                : 'Live OPA sidecar evaluating Rego policies.'}
+            </p>
+            <button
+              className={`btn ${simStatus.simulate_opa_outage ? 'btn-success' : 'btn-danger'} btn-sm`}
+              onClick={handleToggleOpa}
+              style={{ width: '100%' }}
+            >
+              {simStatus.simulate_opa_outage ? 'Restore OPA' : 'Simulate OPA Outage'}
+            </button>
+          </div>
+
+          {/* Redis Outage Toggle */}
+          <div className="glass-card" style={{ textAlign: 'center' }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Redis Cache</div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: simStatus.simulate_redis_outage ? 'var(--accent-crimson)' : 'var(--accent-emerald)',
+              fontWeight: 600,
+              marginBottom: 'var(--space-md)',
+            }}>
+              {simStatus.simulate_redis_outage ? 'SIMULATED OUTAGE' : 'CONNECTED'}
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', lineHeight: 1.5 }}>
+              {simStatus.simulate_redis_outage
+                ? 'Using in-memory dict fallback. Spend caps tracked in-process.'
+                : 'Live Redis handling atomic spend caps and E-stop flags.'}
+            </p>
+            <button
+              className={`btn ${simStatus.simulate_redis_outage ? 'btn-success' : 'btn-danger'} btn-sm`}
+              onClick={handleToggleRedis}
+              style={{ width: '100%' }}
+            >
+              {simStatus.simulate_redis_outage ? 'Restore Redis' : 'Simulate Redis Outage'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* ── Confirm Modal ────────────────────────────────── */}
       {confirming && (
         <div className="modal-overlay" onClick={() => setConfirming(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-dialog">
               <div className="confirm-icon">
-                {confirming === 'halt' ? '🚨' : '✅'}
+                {confirming === 'halt' ? 'HALT' : 'OK'}
               </div>
               <h3 style={{ marginBottom: 'var(--space-md)', color: confirming === 'halt' ? 'var(--accent-crimson)' : 'var(--accent-emerald)' }}>
                 {confirming === 'halt' ? 'Halt Entire Fleet?' : 'Resume Fleet Operations?'}

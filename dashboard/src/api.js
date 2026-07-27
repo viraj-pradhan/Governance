@@ -88,3 +88,42 @@ export function connectLiveFeed(onEvent, onError) {
 
   return es; // caller can close with es.close()
 }
+
+// ── Simulation Toggles (Phase 2) ────────────────────────────
+
+export const fetchSimulationStatus = () => request('/admin/simulate/status');
+
+export const toggleOpaOutage = () =>
+  request('/admin/simulate/opa-outage', { method: 'POST' });
+
+export const toggleRedisOutage = () =>
+  request('/admin/simulate/redis-outage', { method: 'POST' });
+
+export const startTrafficSimulation = () =>
+  request('/admin/simulate/traffic/start', { method: 'POST' });
+
+export const stopTrafficSimulation = () =>
+  request('/admin/simulate/traffic/stop', { method: 'POST' });
+
+// ── Action / Authorize (Phase 2) ────────────────────────────
+
+export const simulateAction = (data) =>
+  request('/action/simulate', { method: 'POST', body: JSON.stringify(data) });
+
+// ── Explanations (Phase 2) ──────────────────────────────────
+
+export const fetchExplanations = () => request('/explanations');
+
+// ── Graph (Phase 2) ─────────────────────────────────────────
+
+export const fetchGraph = () => request('/graph');
+
+// ── Review Queue (Phase 2) ──────────────────────────────────
+
+export const fetchReviewQueue = () => request('/review/queue');
+
+export const approveReview = (traceId) =>
+  request(`/review/${traceId}/approve`, { method: 'POST' });
+
+export const rejectReview = (traceId) =>
+  request(`/review/${traceId}/reject`, { method: 'POST' });

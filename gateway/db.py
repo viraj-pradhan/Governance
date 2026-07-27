@@ -97,10 +97,25 @@ async def _ensure_indexes() -> None:
     await _mongo_db.review_queue.create_index("trace_id", unique=True)
     # flagged_mules
     await _mongo_db.flagged_mules.create_index("account_id", unique=True)
+    # sanctions_list
+    await _mongo_db.sanctions_list.create_index("entity_name", unique=True)
     # ledger
     await _mongo_db.ledger.create_index("trace_id")
     # policies
     await _mongo_db.policies.create_index("agent_id")
+
+    # Seed sanctions list with sample entries (idempotent upserts)
+    sanctions_seed = [
+        {"entity_name": "sanctioned-entity-001", "list_source": "OFAC"},
+        {"entity_name": "blocked-corp-xyz", "list_source": "EU-AML"},
+        {"entity_name": "terror-finance-llc", "list_source": "UN-SC"},
+    ]
+    for entry in sanctions_seed:
+        await _mongo_db.sanctions_list.update_one(
+            {"entity_name": entry["entity_name"]},
+            {"$set": entry},
+            upsert=True
+        )
 
 
 async def close_db() -> None:
@@ -462,6 +477,12 @@ def _init_sqlite_schema():
                 reason TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS sanctions_list (
+                entity_name TEXT PRIMARY KEY,
+                list_source TEXT DEFAULT 'OFAC',
+                added_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS ledger (
                 entry_id TEXT PRIMARY KEY,
                 trace_id TEXT,
@@ -480,6 +501,11 @@ def _init_sqlite_schema():
             );
 
             INSERT OR IGNORE INTO fleet_status (id, halted) VALUES (1, 0);
+
+            -- Seed sanctions list with sample entries
+            INSERT OR IGNORE INTO sanctions_list (entity_name, list_source) VALUES ('sanctioned-entity-001', 'OFAC');
+            INSERT OR IGNORE INTO sanctions_list (entity_name, list_source) VALUES ('blocked-corp-xyz', 'EU-AML');
+            INSERT OR IGNORE INTO sanctions_list (entity_name, list_source) VALUES ('terror-finance-llc', 'UN-SC');
         """)
 
 

@@ -203,8 +203,47 @@ async def set_daily_limit(agent_id: str, limit: Decimal) -> None:
 
 async def get_daily_limit(agent_id: str) -> Optional[Decimal]:
     key = _limit_key(agent_id)
-    if _use_memory:
+    if _use_memory or _is_simulating_outage():
         val = _mem_store.get(key)
     else:
         val = await _redis.get(key)
     return Decimal(val) if val else None
+
+
+# ── Idempotency key cache ────────────────────────────────────
+
+def _idempotency_key(key: str) -> str:
+    return f"idempotency:{key}"
+
+
+async def get_idempotency(key: str) -> Optional[str]:
+    """Look up a cached idempotency response."""
+    k = _idempotency_key(key)
+    if _use_memory or _is_simulating_outage():
+        return _mem_store.get(k)
+    try:
+        return await _redis.get(k)
+    except Exception:
+        return _mem_store.get(k)
+
+
+async def set_idempotency(key: str, response_json: str, ttl: int = 300) -> None:
+    """Cache an idempotency response with TTL (seconds)."""
+    k = _idempotency_key(key)
+    if _use_memory or _is_simulating_outage():
+        _mem_store[k] = response_json
+        return
+    try:
+        await _redis.set(k, response_json, ex=ttl)
+    except Exception:
+        _mem_store[k] = response_json
+
+
+# ── Simulation flag support ──────────────────────────────────
+
+def _is_simulating_outage() -> bool:
+    """Check if Redis outage simulation is active."""
+    try:
+        return settings.simulate_redis_outage
+    except Exception:
+        return False

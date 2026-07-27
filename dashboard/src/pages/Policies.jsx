@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchPolicies, fetchAgents, createPolicy } from '../api';
+import { fetchPolicies, fetchAgents, createPolicy, simulateAction } from '../api';
 
 export default function Policies() {
   const [policies, setPolicies] = useState([]);
@@ -8,6 +8,10 @@ export default function Policies() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [showSimulate, setShowSimulate] = useState(false);
+  const [simForm, setSimForm] = useState({ agent_id: '', action: 'transfer_funds', amount: 5000, beneficiary: '' });
+  const [simResult, setSimResult] = useState(null);
+  const [simRunning, setSimRunning] = useState(false);
   const [form, setForm] = useState({
     agent_id: '',
     rego_body: `package governance
@@ -87,9 +91,14 @@ reason := "read_balance is always permitted" if {
           <h2>Policies</h2>
           <p>Rego policies governing agent permissions and spend limits</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          + New Policy
-        </button>
+        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            + New Policy
+          </button>
+          <button className="btn btn-ghost" onClick={() => { setShowSimulate(true); setSimResult(null); }}>
+            Simulate Action
+          </button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -111,7 +120,6 @@ reason := "read_balance is always permitted" if {
 
       {policies.length === 0 ? (
         <div className="glass-card empty-state">
-          <div className="empty-icon">📋</div>
           <p>No policies found. Create one to get started.</p>
         </div>
       ) : (
@@ -136,7 +144,7 @@ reason := "read_balance is always permitted" if {
                   className="btn btn-ghost btn-sm"
                   onClick={() => setExpandedId(expandedId === policy.id ? null : policy.id)}
                 >
-                  {expandedId === policy.id ? '▲ Hide Rego' : '▼ Show Rego'}
+                  {expandedId === policy.id ? 'Hide Rego' : 'Show Rego'}
                 </button>
               </div>
 
@@ -207,6 +215,130 @@ reason := "read_balance is always permitted" if {
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setShowCreate(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={handleCreate}>Create Policy</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Simulate Action Modal ──────────────────────────── */}
+      {showSimulate && (
+        <div className="modal-overlay" onClick={() => setShowSimulate(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ minWidth: 520 }}>
+            <div className="modal-header">
+              <h3>Simulate Action (Dry-Run)</h3>
+              <button className="modal-close" onClick={() => setShowSimulate(false)}>×</button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)' }}>
+              Test an action through the full governance pipeline without side effects.
+              No audit log, no spend increment, no ledger entry.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Agent</label>
+              <select
+                className="form-select"
+                value={simForm.agent_id}
+                onChange={(e) => setSimForm({ ...simForm, agent_id: e.target.value })}
+              >
+                <option value="">Select agent...</option>
+                {agents.map(a => (
+                  <option key={a.agent_id || a.id} value={a.agent_id || a.id}>{a.name} ({a.agent_id || a.id})</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Action</label>
+              <select
+                className="form-select"
+                value={simForm.action}
+                onChange={(e) => setSimForm({ ...simForm, action: e.target.value })}
+              >
+                <option value="transfer_funds">transfer_funds</option>
+                <option value="read_balance">read_balance</option>
+                <option value="close_account">close_account</option>
+                <option value="read_transactions">read_transactions</option>
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+              <div className="form-group">
+                <label className="form-label">Amount ($)</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  value={simForm.amount}
+                  onChange={(e) => setSimForm({ ...simForm, amount: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Beneficiary</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="e.g. vendor-45"
+                  value={simForm.beneficiary}
+                  onChange={(e) => setSimForm({ ...simForm, beneficiary: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Result */}
+            {simResult && (
+              <div style={{
+                marginTop: 'var(--space-md)',
+                padding: 'var(--space-md)',
+                background: simResult.outcome === 'ALLOW' ? 'var(--accent-emerald-glow)' :
+                            simResult.outcome === 'HOLD' ? 'var(--accent-amber-glow)' : 'var(--accent-crimson-glow)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <strong>{simResult.outcome}</strong>
+                  <code style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '0.75rem',
+                    background: 'rgba(0,0,0,0.15)', padding: '2px 8px', borderRadius: 4,
+                  }}>{simResult.reason_code}</code>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  {simResult.explanation}
+                </div>
+                {simResult.risk_score != null && (
+                  <div style={{ fontSize: '0.8rem', marginTop: 8 }}>
+                    <strong>Risk Score:</strong> {simResult.risk_score}
+                    {simResult.risk_factors && simResult.risk_factors.length > 0 && (
+                      <span> — Factors: {simResult.risk_factors.join(', ')}</span>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                  Latency: {simResult.latency_ms}ms | Trace: {simResult.trace_id?.slice(0, 8)}...
+                </div>
+              </div>
+            )}
+
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setShowSimulate(false)}>Close</button>
+              <button
+                className="btn btn-primary"
+                disabled={!simForm.agent_id || simRunning}
+                onClick={async () => {
+                  setSimRunning(true);
+                  setSimResult(null);
+                  try {
+                    const res = await simulateAction({
+                      agent_id: simForm.agent_id,
+                      version: '1.0.0',
+                      action: simForm.action,
+                      amount: Number(simForm.amount) || 0,
+                      beneficiary: simForm.beneficiary || undefined,
+                    });
+                    setSimResult(res);
+                  } catch (e) {
+                    setSimResult({ outcome: 'ERROR', reason_code: 'CLIENT_ERROR', explanation: e.message, latency_ms: 0 });
+                  } finally {
+                    setSimRunning(false);
+                  }
+                }}
+              >
+                {simRunning ? 'Running...' : 'Run Simulation'}
+              </button>
             </div>
           </div>
         </div>

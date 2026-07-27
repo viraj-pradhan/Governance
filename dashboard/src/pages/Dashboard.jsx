@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchAgents, fetchLatencyMetrics, fetchFleetStatus, fetchAuditLog } from '../api';
+import { fetchAgents, fetchLatencyMetrics, fetchFleetStatus, fetchAuditLog, fetchSimulationStatus, startTrafficSimulation, stopTrafficSimulation } from '../api';
 
 export default function Dashboard() {
   const [agents, setAgents] = useState([]);
@@ -7,19 +7,25 @@ export default function Dashboard() {
   const [fleet, setFleet] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [simRunning, setSimRunning] = useState(false);
+  const [simProcessing, setSimProcessing] = useState(false);
 
   const load = async () => {
     try {
-      const [a, m, f, l] = await Promise.all([
+      const [a, m, f, l, s] = await Promise.all([
         fetchAgents(),
         fetchLatencyMetrics().catch(() => null),
         fetchFleetStatus().catch(() => null),
         fetchAuditLog({ limit: 10 }).catch(() => []),
+        fetchSimulationStatus().catch(() => null),
       ]);
       setAgents(a);
       setMetrics(m);
       setFleet(f);
       setRecentLogs(l);
+      if (s) {
+        setSimRunning(s.traffic_running);
+      }
     } catch (e) {
       console.error('Dashboard load error:', e);
     } finally {
@@ -29,9 +35,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 5000);
+    const interval = setInterval(load, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleToggleSimulation = async () => {
+    setSimProcessing(true);
+    try {
+      if (simRunning) {
+        await stopTrafficSimulation();
+        setSimRunning(false);
+      } else {
+        await startTrafficSimulation();
+        setSimRunning(true);
+      }
+      await load();
+    } catch (e) {
+      alert(`Simulation Error: ${e.message}`);
+    } finally {
+      setSimProcessing(false);
+    }
+  };
 
   const activeCount = agents.filter(a => a.status === 'active').length;
   const revokedCount = agents.filter(a => a.status === 'revoked').length;
@@ -52,16 +76,44 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="page-header">
-        <h2>Dashboard</h2>
-        <p>Real-time overview of your governance gateway</p>
+      <div className="page-header flex justify-between items-center">
+        <div>
+          <h2>Dashboard</h2>
+          <p>Real-time overview of your governance gateway</p>
+        </div>
+
+        {/* ── Start / Pause Simulation Button ─────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+          {simRunning && (
+            <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px' }}>
+              <span className="status-dot"></span>
+              TRAFFIC RUNNING
+            </span>
+          )}
+          <button
+            className={`btn ${simRunning ? 'btn-danger' : 'btn-primary'}`}
+            style={{
+              padding: '10px 22px',
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              boxShadow: simRunning ? 'var(--shadow-glow-crimson)' : 'var(--shadow-glow-blue)',
+            }}
+            onClick={handleToggleSimulation}
+            disabled={simProcessing}
+          >
+            {simProcessing ? (
+              <span className="spinner" style={{ width: 14, height: 14, marginRight: 8 }}></span>
+            ) : null}
+            {simRunning ? 'Pause Agent Simulation' : 'Start Agent Fleet Simulation'}
+          </button>
+        </div>
       </div>
 
       {/* ── Fleet status banner ──────────────────────────── */}
       {fleet && fleet.halted && (
         <div className="glass-card card-crimson" style={{ marginBottom: 'var(--space-lg)', textAlign: 'center' }}>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-crimson)' }}>
-            🚨 FLEET HALTED — All agent actions are being denied
+            FLEET HALTED — All agent actions are being denied
           </div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
             Halted by: {fleet.halted_by || 'unknown'} • {fleet.halted_at ? new Date(fleet.halted_at).toLocaleString() : ''}
@@ -123,7 +175,7 @@ export default function Dashboard() {
         {recentLogs.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📡</div>
-            <p>No activity yet. Start mock agents to generate traffic.</p>
+            <p>No activity yet. Click "▶ Start Agent Fleet Simulation" above to generate live traffic.</p>
           </div>
         ) : (
           <table className="data-table">
@@ -139,18 +191,18 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {recentLogs.map((log) => (
-                <tr key={log.id}>
+              {recentLogs.map((log, index) => (
+                <tr key={log.trace_id || index}>
                   <td>
-                    <span className={`badge ${log.decision === 'ALLOW' ? 'badge-allow' : 'badge-deny'}`}>
-                      {log.decision === 'ALLOW' ? '✓' : '✗'} {log.decision}
+                    <span className={`badge ${log.outcome === 'ALLOW' || log.decision === 'ALLOW' ? 'badge-allow' : 'badge-deny'}`}>
+                      {log.outcome === 'ALLOW' || log.decision === 'ALLOW' ? '✓' : '✗'} {log.outcome || log.decision}
                     </span>
                   </td>
                   <td className="mono truncate">{log.agent_id?.slice(0, 8) ?? '—'}</td>
                   <td style={{ fontWeight: 500 }}>{log.action}</td>
                   <td className="mono">{log.amount ? `$${Number(log.amount).toLocaleString()}` : '—'}</td>
                   <td className="text-secondary" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {log.reason}
+                    {log.reason_code || log.reason}
                   </td>
                   <td>
                     <span className={`latency-gauge ${latencyClass(log.latency_ms)}`}>
@@ -159,7 +211,7 @@ export default function Dashboard() {
                     </span>
                   </td>
                   <td className="text-muted" style={{ fontSize: '0.78rem' }}>
-                    {new Date(log.created_at).toLocaleTimeString()}
+                    {new Date(log.timestamp || log.created_at || Date.now()).toLocaleTimeString()}
                   </td>
                 </tr>
               ))}

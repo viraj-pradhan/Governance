@@ -7,6 +7,8 @@ import LiveActivity from './pages/LiveActivity';
 import AuditLog from './pages/AuditLog';
 import EmergencyStop from './pages/EmergencyStop';
 import ReviewQueue from './pages/ReviewQueue';
+import ReasonCodes from './pages/ReasonCodes';
+import MuleGraph from './pages/MuleGraph';
 import Login from './pages/Login';
 import './App.css';
 
@@ -22,6 +24,8 @@ function Header({ user, onLogout, theme, onToggleTheme }) {
       case '/review': return 'Human-in-the-Loop Review Queue';
       case '/audit': return 'Unified Audit Log';
       case '/emergency': return 'Global Emergency Stop';
+      case '/reason-codes': return 'Reason Code Reference';
+      case '/mule-graph': return 'Mule Network Graph';
       default: return 'Governance Gateway';
     }
   };
@@ -40,7 +44,6 @@ function Header({ user, onLogout, theme, onToggleTheme }) {
           onClick={onToggleTheme}
           title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
         >
-          <span className="theme-toggle-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
           <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
         </button>
 
@@ -73,29 +76,37 @@ function MainLayout({ user, onLogout, theme, onToggleTheme }) {
         <nav className="sidebar-nav">
           <span className="nav-section-label">Overview</span>
           <NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">📊</span> Dashboard
+            Dashboard
           </NavLink>
           <NavLink to="/live" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">⚡</span> Live Activity
+            Live Activity
           </NavLink>
 
           <span className="nav-section-label">Management</span>
           <NavLink to="/agents" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">🤖</span> Agents
+            Agents
           </NavLink>
           <NavLink to="/policies" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">📋</span> Policies
+            Policies
           </NavLink>
 
           <span className="nav-section-label">Operations</span>
           <NavLink to="/review" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">⚖️</span> Review Queue
+            Review Queue
           </NavLink>
           <NavLink to="/audit" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">📜</span> Audit Log
+            Audit Log
           </NavLink>
           <NavLink to="/emergency" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">🚨</span> Emergency Stop
+            Emergency Stop
+          </NavLink>
+
+          <span className="nav-section-label">Intelligence</span>
+          <NavLink to="/mule-graph" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Mule Network
+          </NavLink>
+          <NavLink to="/reason-codes" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Reason Codes
           </NavLink>
         </nav>
 
@@ -129,6 +140,8 @@ function MainLayout({ user, onLogout, theme, onToggleTheme }) {
             <Route path="/review" element={<ReviewQueue />} />
             <Route path="/audit" element={<AuditLog />} />
             <Route path="/emergency" element={<EmergencyStop />} />
+            <Route path="/reason-codes" element={<ReasonCodes />} />
+            <Route path="/mule-graph" element={<MuleGraph />} />
           </Routes>
         </div>
       </main>

@@ -42,7 +42,13 @@ async def evaluate_policy(
     """Query OPA for a governance decision.
 
     Returns (allowed: bool, reason: str).
+    If OPA is unreachable or simulated down, falls back to in-process rules.
+    If even the fallback fails, returns DENY (fail-closed).
     """
+    # Check simulation flag — skip OPA entirely
+    if settings.simulate_opa_outage:
+        return _in_process_fallback(action, amount)
+
     payload = {
         "input": {
             "agent_id": agent_id,
@@ -66,7 +72,13 @@ async def evaluate_policy(
     except httpx.HTTPStatusError as exc:
         return False, f"OPA error: {exc.response.status_code}"
     except (httpx.ConnectError, httpx.HTTPError, Exception):
-        # Fallback to in-process rule evaluation as per hackathon specification interface
+        # Fallback to in-process rule evaluation
+        return _in_process_fallback(action, amount)
+
+
+def _in_process_fallback(action: str, amount: Optional[float]) -> tuple[bool, str]:
+    """In-process policy evaluation fallback. Fail-closed: unknown actions -> DENY."""
+    try:
         if action in ("read_balance", "read_transactions"):
             return True, "read_balance/read_transactions is permitted by policy"
         if action == "transfer_funds":
@@ -75,7 +87,11 @@ async def evaluate_policy(
             return True, "transfer_funds permitted by policy"
         if action == "close_account":
             return False, "close_account requires administrative privilege"
+        # Unknown action -> DENY (fail-closed)
         return False, f"action {action} not permitted by policy"
+    except Exception:
+        # If even the fallback errors -> absolute fail-closed DENY
+        return False, "POLICY_ENGINE_UNAVAILABLE: both OPA and fallback failed"
 
 
 

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     port: int = 8000
     debug: bool = False
 
+    # Simulation flags (runtime-mutable for demo toggles)
+    simulate_opa_outage: bool = False
+    simulate_redis_outage: bool = False
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

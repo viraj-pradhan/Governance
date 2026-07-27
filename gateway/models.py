@@ -19,13 +19,16 @@ class ActionRequest(BaseModel):
     amount: Optional[Decimal] = None
     beneficiary: Optional[str] = None
     context: dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: Optional[str] = None
 
 
 class ActionResponse(BaseModel):
     trace_id: str
-    outcome: str  # ALLOW | DENY | ESCALATE | REJECT | BLOCKED
+    outcome: str  # ALLOW | DENY | ESCALATE | REJECT | BLOCKED | HOLD
     reason_code: str
     explanation: Optional[str] = None
+    risk_score: Optional[int] = None
+    risk_factors: Optional[list[str]] = None
     latency_ms: float
 
 

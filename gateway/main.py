@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from gateway import db, redis_client, opa_client
-from gateway.routers import authorize, agents, policies, kill_switch, audit, metrics, live, estop, review
+from gateway.routers import authorize, agents, policies, kill_switch, audit, metrics, live, estop, review, explanations, admin, graph
 
 
 @asynccontextmanager
@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Governance Gateway",
     description="Authorization gateway for autonomous financial agents",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -51,6 +51,9 @@ app.include_router(metrics.router)
 app.include_router(live.router)
 app.include_router(estop.router)
 app.include_router(review.router)
+app.include_router(explanations.router)
+app.include_router(admin.router)
+app.include_router(graph.router)
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
